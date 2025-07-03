@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}대시보드 - Trading Bot{% endblock %}
+{% block page_title %}대시보드{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 전체 통계 카드들 -->
+    <div class="col-md-3 mb-4">
+        <div class="card status-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title text-muted">활성 KIS 계좌</h6>
+                        <h3 class="mb-0">{{ kis_accounts|selectattr("active")|list|length }}</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-bank text-success fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card status-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title text-muted">전체 KIS 계좌</h6>
+                        <h3 class="mb-0">{{ kis_accounts|length }}</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-list-ul text-primary fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card status-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title text-muted">활성 거래소</h6>
+                        <h3 class="mb-0" id="active-exchanges">{{ portfolio_status.get('exchanges', {})|selectattr("status", "equalto", "active")|list|length if portfolio_status else 0 }}</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-arrow-left-right text-info fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card status-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title text-muted">총 활성 계좌</h6>
+                        <h3 class="mb-0" id="total-accounts">{{ portfolio_status.get('total_active_accounts', 0) if portfolio_status else 0 }}</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-check-circle text-success fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- KIS 계좌 현황 -->
+    <div class="col-md-8 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-bank me-2"></i>KIS 계좌 현황
+                </h5>
+                <a href="{{ url_for('config_page') }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-gear me-1"></i>관리
+                </a>
+            </div>
+            <div class="card-body">
+                {% if kis_accounts %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>계좌</th>
+                                    <th>계좌번호</th>
+                                    <th>상품코드</th>
+                                    <th>상태</th>
+                                    <th>연결 상태</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for account in kis_accounts %}
+                                <tr>
+                                    <td><strong>KIS{{ account.number }}</strong></td>
+                                    <td>
+                                        {% if account.account_number %}
+                                            {{ account.account_number[:4] }}****{{ account.account_number[-4:] if account.account_number|length > 8 else account.account_number }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ account.account_code or '-' }}</td>
+                                    <td>
+                                        {% if account.active %}
+                                            <span class="badge bg-success account-badge">활성</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary account-badge">비활성</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info account-badge" id="kis{{ account.number }}-status">확인 중...</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-inbox display-4 text-muted"></i>
+                        <p class="text-muted mt-2">등록된 KIS 계좌가 없습니다.</p>
+                        <a href="{{ url_for('config_page') }}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle me-2"></i>계좌 추가
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- 거래소 현황 -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-globe me-2"></i>거래소 현황
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="exchanges-status">
+                    {% if portfolio_status and portfolio_status.get('exchanges') %}
+                        {% for exchange, status in portfolio_status.exchanges.items() %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-semibold">{{ exchange.upper() }}</span>
+                            {% if status.status == 'active' %}
+                                <span class="badge bg-success">연결됨</span>
+                            {% elif status.status == 'error' %}
+                                <span class="badge bg-danger">오류</span>
+                            {% else %}
+                                <span class="badge bg-secondary">미설정</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-3">
+                            <i class="bi bi-wifi-off display-6 text-muted"></i>
+                            <p class="text-muted mt-2 mb-0">거래소 정보를 불러오는 중...</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 최근 활동 로그 -->
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-activity me-2"></i>시스템 정보
+                </h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="refreshSystemInfo()">
+                    <i class="bi bi-arrow-clockwise me-1"></i>새로고침
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-muted">서버 시간</h6>
+                        <p id="server-time">{{ moment().format('YYYY-MM-DD HH:mm:ss') }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted">마지막 업데이트</h6>
+                        <p id="last-update">{{ portfolio_status.get('timestamp', 'N/A') if portfolio_status else 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted">봇 버전</h6>
+                        <p>v1.0</p>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <h6 class="text-muted">웹훅 URL</h6>
+                    <div class="input-group">
+                        <input type="text" class="form-control" value="{{ request.url_root }}webhook/tradingview" readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyWebhookUrl()">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted">트레이딩뷰 알람에서 이 URL을 사용하세요.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 시간 업데이트
+    function updateServerTime() {
+        const now = new Date();
+        document.getElementById('server-time').textContent = now.toLocaleString('ko-KR');
+    }
+    
+    // 웹훅 URL 복사
+    function copyWebhookUrl() {
+        const input = document.querySelector('input[readonly]');
+        input.select();
+        input.setSelectionRange(0, 99999);
+        document.execCommand('copy');
+        showAlert('웹훅 URL이 클립보드에 복사되었습니다!', 'success');
+    }
+    
+    // 시스템 정보 새로고침
+    function refreshSystemInfo() {
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.error) {
+                    // 거래소 상태 업데이트
+                    updateExchangeStatus(data.exchanges);
+                    
+                    // KIS 계좌 상태 업데이트
+                    updateKISStatus(data.kis_accounts);
+                    
+                    // 통계 업데이트
+                    document.getElementById('active-exchanges').textContent = 
+                        Object.values(data.exchanges || {}).filter(e => e.status === 'active').length;
+                    document.getElementById('total-accounts').textContent = data.total_active_accounts || 0;
+                    
+                    // 마지막 업데이트 시간
+                    document.getElementById('last-update').textContent = data.timestamp || 'N/A';
+                    
+                    showAlert('시스템 정보가 업데이트되었습니다.', 'success');
+                } else {
+                    showAlert('시스템 정보 업데이트에 실패했습니다: ' + data.error, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('오류가 발생했습니다: ' + error.message, 'danger');
+            });
+    }
+    
+    function updateExchangeStatus(exchanges) {
+        const container = document.getElementById('exchanges-status');
+        if (!exchanges) return;
+        
+        let html = '';
+        for (const [exchange, status] of Object.entries(exchanges)) {
+            let badgeClass = 'secondary';
+            let statusText = '미설정';
+            
+            if (status.status === 'active') {
+                badgeClass = 'success';
+                statusText = '연결됨';
+            } else if (status.status === 'error') {
+                badgeClass = 'danger';
+                statusText = '오류';
+            }
+            
+            html += `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-semibold">${exchange.toUpperCase()}</span>
+                    <span class="badge bg-${badgeClass}">${statusText}</span>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    }
+    
+    function updateKISStatus(accounts) {
+        if (!accounts) return;
+        
+        for (const [accountName, status] of Object.entries(accounts)) {
+            const element = document.getElementById(accountName + '-status');
+            if (element) {
+                if (status.status === 'active') {
+                    element.className = 'badge bg-success account-badge';
+                    element.textContent = '연결됨';
+                } else if (status.status === 'error') {
+                    element.className = 'badge bg-danger account-badge';
+                    element.textContent = '오류';
+                } else {
+                    element.className = 'badge bg-secondary account-badge';
+                    element.textContent = '미설정';
+                }
+            }
+        }
+    }
+    
+    // 페이지 로드 시 실행
+    document.addEventListener('DOMContentLoaded', function() {
+        updateServerTime();
+        setInterval(updateServerTime, 1000); // 1초마다 시간 업데이트
+        
+        // 5초 후 상태 새로고침
+        setTimeout(refreshSystemInfo, 5000);
+    });
+</script>
+{% endblock %}

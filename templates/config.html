@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+
+{% block title %}설정 - Trading Bot{% endblock %}
+{% block page_title %}설정{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- KIS 계좌 설정 -->
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-bank me-2"></i>KIS 계좌 관리
+                </h5>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addKisModal">
+                    <i class="bi bi-plus-circle me-1"></i>계좌 추가
+                </button>
+            </div>
+            <div class="card-body">
+                {% if kis_accounts %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>계좌</th>
+                                    <th>계좌번호</th>
+                                    <th>상품코드</th>
+                                    <th>API 키</th>
+                                    <th>상태</th>
+                                    <th>작업</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for account in kis_accounts %}
+                                <tr id="kis-row-{{ account.number }}">
+                                    <td><strong>KIS{{ account.number }}</strong></td>
+                                    <td>
+                                        {% if account.account_number %}
+                                            {{ account.account_number[:4] }}****{{ account.account_number[-4:] if account.account_number|length > 8 else account.account_number }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ account.account_code or '-' }}</td>
+                                    <td>
+                                        {% if account.key %}
+                                            {{ account.key[:8] }}****
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if account.active %}
+                                            <span class="badge bg-success">활성</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">비활성</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" onclick="editKisAccount({{ account.number }})">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" onclick="deleteKisAccount({{ account.number }})">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-inbox display-4 text-muted"></i>
+                        <p class="text-muted mt-2">등록된 KIS 계좌가 없습니다.</p>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addKisModal">
+                            <i class="bi bi-plus-circle me-2"></i>첫 번째 계좌 추가
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 거래소 API 설정 -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-globe me-2"></i>거래소 API 설정
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="exchangeAccordion">
+                    {% for exchange_name, config in exchanges.items() %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading{{ exchange_name|title }}">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                    data-bs-target="#collapse{{ exchange_name|title }}" aria-expanded="false">
+                                <i class="bi bi-arrow-left-right me-2"></i>
+                                {{ exchange_name.upper() }}
+                                {% if config.key %}
+                                    <span class="badge bg-success ms-2">설정됨</span>
+                                {% else %}
+                                    <span class="badge bg-secondary ms-2">미설정</span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="collapse{{ exchange_name|title }}" class="accordion-collapse collapse" 
+                             data-bs-parent="#exchangeAccordion">
+                            <div class="accordion-body">
+                                <form onsubmit="updateExchange(event, '{{ exchange_name }}')">
+                                    <div class="mb-3">
+                                        <label class="form-label">API Key</label>
+                                        <input type="text" class="form-control" name="key" 
+                                               value="{{ config.key or '' }}" placeholder="API 키를 입력하세요">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Secret Key</label>
+                                        <input type="password" class="form-control" name="secret" 
+                                               value="{{ config.secret or '' }}" placeholder="시크릿 키를 입력하세요">
+                                    </div>
+                                    {% if exchange_name in ['okx', 'bitget'] %}
+                                    <div class="mb-3">
+                                        <label class="form-label">Passphrase</label>
+                                        <input type="password" class="form-control" name="passphrase" 
+                                               value="{{ config.passphrase or '' }}" placeholder="패스프레이즈를 입력하세요">
+                                    </div>
+                                    {% endif %}
+                                    {% if exchange_name == 'bitget' %}
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="demo" 
+                                                   {{ 'checked' if config.demo else '' }}>
+                                            <label class="form-check-label">
+                                                데모 모드 사용
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-check-circle me-1"></i>저장
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 시스템 설정 -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-gear me-2"></i>시스템 설정
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- 디스코드 웹훅 설정 -->
+                <div class="mb-4">
+                    <label class="form-label">디스코드 웹훅 URL</label>
+                    <div class="input-group">
+                        <input type="url" class="form-control" id="discordWebhookUrl" 
+                               value="{{ discord_url or '' }}" 
+                               placeholder="https://discord.com/api/webhooks/...">
+                        <button class="btn btn-outline-primary" onclick="updateDiscordWebhook()">
+                            <i class="bi bi-check-circle"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted">디스코드 채널에서 웹훅 URL을 생성하여 입력하세요.</small>
+                </div>
+                
+                <!-- 웹훅 시크릿 설정 -->
+                <div class="mb-4">
+                    <label class="form-label">트레이딩뷰 웹훅 시크릿</label>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="webhookSecret" 
+                               value="{{ webhook_secret or '' }}" 
+                               placeholder="웹훅 보안을 위한 시크릿 키">
+                        <button class="btn btn-outline-primary" onclick="updateWebhookSecret()">
+                            <i class="bi bi-check-circle"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted">트레이딩뷰 웹훅 보안을 위한 시크릿 키입니다.</small>
+                </div>
+                
+                <!-- 웹훅 URL 정보 -->
+                <div class="mb-4">
+                    <label class="form-label">트레이딩뷰 웹훅 URL</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" value="{{ request.url_root }}webhook/tradingview" readonly>
+                        <button class="btn btn-outline-secondary" onclick="copyWebhookUrl()">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted">트레이딩뷰 알람에서 이 URL을 사용하세요.</small>
+                </div>
+                
+                <!-- 디스코드 명령어 안내 -->
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle me-1"></i>디스코드 명령어</h6>
+                    <small>
+                        • <code>!help</code> - 명령어 도움말<br>
+                        • <code>!status</code> - 봇 상태 확인<br>
+                        • <code>!list_kis</code> - KIS 계좌 목록<br>
+                        • <code>!add_kis [번호] key:[키] secret:[시크릿] account:[계좌] code:[코드]</code>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KIS 계좌 추가/수정 모달 -->
+<div class="modal fade" id="addKisModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="kisModalTitle">KIS 계좌 추가</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="kisForm" onsubmit="saveKisAccount(event)">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">계좌 번호 (1-50)</label>
+                        <input type="number" class="form-control" id="kisAccountNumber" 
+                               min="1" max="50" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">API Key</label>
+                        <input type="text" class="form-control" id="kisKey" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Secret Key</label>
+                        <input type="password" class="form-control" id="kisSecret" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">계좌번호</label>
+                        <input type="text" class="form-control" id="kisAccNumber" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">상품코드</label>
+                        <input type="text" class="form-control" id="kisAccCode" required>
+                        <small class="text-muted">일반적으로 "01" (종합계좌) 또는 "22" (위탁계좌)</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let editingKisAccount = null;
+    
+    function saveKisAccount(event) {
+        event.preventDefault();
+        
+        const accountNumber = document.getElementById('kisAccountNumber').value;
+        const key = document.getElementById('kisKey').value;
+        const secret = document.getElementById('kisSecret').value;
+        const accNumber = document.getElementById('kisAccNumber').value;
+        const accCode = document.getElementById('kisAccCode').value;
+        
+        const data = {
+            account_number: parseInt(accountNumber),
+            key: key,
+            secret: secret,
+            acc_number: accNumber,
+            acc_code: accCode
+        };
+        
+        fetch('/api/kis/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('addKisModal')).hide();
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showAlert(data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('오류가 발생했습니다: ' + error.message, 'danger');
+        });
+    }
+    
+    function editKisAccount(accountNumber) {
+        editingKisAccount = accountNumber;
+        
+        // 기존 데이터로 폼 채우기 (실제로는 API에서 가져와야 함)
+        document.getElementById('kisAccountNumber').value = accountNumber;
+        document.getElementById('kisModalTitle').textContent = `KIS${accountNumber} 계좌 수정`;
+        
+        // 모달 표시
+        new bootstrap.Modal(document.getElementById('addKisModal')).show();
+    }
+    
+    function deleteKisAccount(accountNumber) {
+        if (!confirm(`KIS${accountNumber} 계좌를 정말 삭제하시겠습니까?`)) {
+            return;
+        }
+        
+        fetch(`/api/kis/delete/${accountNumber}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                document.getElementById(`kis-row-${accountNumber}`).remove();
+            } else {
+                showAlert(data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('오류가 발생했습니다: ' + error.message, 'danger');
+        });
+    }
+    
+    function updateExchange(event, exchange) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        const data = {
+            exchange: exchange,
+            key: formData.get('key'),
+            secret: formData.get('secret')
+        };
+        
+        if (formData.get('passphrase')) {
+            data.passphrase = formData.get('passphrase');
+        }
+        
+        if (exchange === 'bitget') {
+            data.demo = formData.get('demo') === 'on';
+        }
+        
+        fetch('/api/exchange/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showAlert(data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('오류가 발생했습니다: ' + error.message, 'danger');
+        });
+    }
+    
+    function updateDiscordWebhook() {
+        const url = document.getElementById('discordWebhookUrl').value;
+        
+        fetch('/api/discord/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({url: url})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+            } else {
+                showAlert(data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('오류가 발생했습니다: ' + error.message, 'danger');
+        });
+    }
+    
+    function updateWebhookSecret() {
+        const secret = document.getElementById('webhookSecret').value;
+        
+        fetch('/api/webhook/secret', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({secret: secret})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+            } else {
+                showAlert(data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('오류가 발생했습니다: ' + error.message, 'danger');
+        });
+    }
+    
+    function copyWebhookUrl() {
+        const input = document.querySelector('input[readonly]');
+        input.select();
+        input.setSelectionRange(0, 99999);
+        document.execCommand('copy');
+        showAlert('웹훅 URL이 클립보드에 복사되었습니다!', 'success');
+    }
+    
+    // 모달 리셋
+    document.getElementById('addKisModal').addEventListener('hidden.bs.modal', function () {
+        document.getElementById('kisForm').reset();
+        document.getElementById('kisModalTitle').textContent = 'KIS 계좌 추가';
+        editingKisAccount = null;
+    });
+</script>
+{% endblock %}
