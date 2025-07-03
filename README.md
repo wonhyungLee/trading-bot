@@ -154,6 +154,73 @@ http://your-server:8000/webhook/tradingview
    - 프로덕션 환경에서는 IP 화이트리스트 설정
    - 방화벽으로 불필요한 포트 차단
 
+## 🚨 웹훅 수신 및 디스코드 반응 문제 해결
+
+### 🔧 원클릭 자동 수정
+```bash
+# 모든 문제를 자동으로 감지하고 수정
+quick_fix.bat
+```
+
+### 🔍 상세 진단
+```bash
+# 전체 시스템 진단 (권장)
+python debug_webhook_full.py
+```
+
+### 📋 단계별 문제 해결
+자세한 해결 방법은 **TROUBLESHOOTING.md** 파일을 참고하세요.
+
+### 🛠️ 주요 해결 도구들
+
+#### 1. 디스코드 웹훅 설정
+```bash
+# 디스코드 설정 가이드 확인
+type DISCORD_SETUP.md
+```
+
+#### 2. 방화벽 자동 설정
+```bash
+# 관리자 권한으로 실행
+setup_firewall.bat
+```
+
+#### 3. 웹훅 테스트 서버
+```bash
+# 간단한 테스트 서버 실행
+python test_webhook_server.py
+```
+
+### ⚠️ 일반적인 문제들
+
+#### 🔴 웹훅이 수신되지 않는 경우
+1. **서버 미실행**: `run.bat` 실행 확인
+2. **포트 차단**: 방화벽에서 포트 8000 허용
+3. **잘못된 URL**: 트레이딩뷰에서 정확한 웹훅 URL 설정
+   ```
+   http://YOUR_SERVER_IP:8000/webhook/tradingview
+   ```
+4. **네트워크 접근 불가**: 외부에서 서버 접근 불가능
+
+#### 🔴 디스코드 알림이 오지 않는 경우
+1. **웹훅 URL 미설정**: `.env` 파일에서 `DISCORD_WEBHOOK_URL` 설정
+2. **잘못된 웹훅 URL**: 디스코드에서 올바른 웹훅 URL 복사
+3. **권한 부족**: 디스코드 채널에서 웹훅 권한 확인
+4. **네트워크 문제**: Discord API 접근 차단
+
+#### 🔴 서버가 시작되지 않는 경우
+1. **가상환경 없음**: `python -m venv venv` 실행
+2. **패키지 미설치**: `pip install -r requirements.txt` 실행
+3. **포트 충돌**: 다른 프로그램이 포트 8000 사용 중
+4. **권한 문제**: 관리자 권한으로 실행
+
+### 📞 추가 지원
+
+문제가 지속되는 경우:
+1. `debug_webhook_full.py` 실행 결과 확인
+2. `trading_bot.log` 파일의 오류 메시지 확인  
+3. `TROUBLESHOOTING.md`의 전체 체크리스트 수행
+
 ## 문제 해결
 
 ### 1. KIS API 연결 실패
